@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interi Patient App</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
+        #registration { display: none; padding: 20px; background-image: url('https://placehold.co/600x400/png?text=Interi+Booth+Photo'); /* Replace with actual uploaded photo URL or base64 */ background-size: cover; background-position: center; height: 100vh; }
+        #registration form { background: rgba(255,255,255,0.8); padding: 20px; border-radius: 10px; }
+        input, select { width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; }
+        button { padding: 10px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        #main { display: none; }
+        #chat { height: 300px; overflow-y: scroll; background: white; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        #chat p { margin: 5px 0; padding: 10px; border-radius: 5px; }
+        #chat p.app { background: #e0f7fa; }
+        #chat p.user { background: #c8e6c9; text-align: right; }
+        #inputArea { margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div id="registration">
+        <form>
+            <input id="firstName" placeholder="First Name" required>
+            <input id="lastName" placeholder="Last Name" required>
+            <select id="state" required>
+                <option value="">Select State</option>
+                <!-- All states options as before -->
+                <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option><option value="AR">AR</option><option value="CA">CA</option><option value="CO">CO</option><option value="CT">CT</option><option value="DE">DE</option><option value="FL">FL</option><option value="GA">GA</option><option value="HI">HI</option><option value="ID">ID</option><option value="IL">IL</option><option value="IN">IN</option><option value="IA">IA</option><option value="KS">KS</option><option value="KY">KY</option><option value="LA">LA</option><option value="ME">ME</option><option value="MD">MD</option><option value="MA">MA</option><option value="MI">MI</option><option value="MN">MN</option><option value="MS">MS</option><option value="MO">MO</option><option value="MT">MT</option><option value="NE">NE</option><option value="NV">NV</option><option value="NH">NH</option><option value="NJ">NJ</option><option value="NM">NM</option><option value="NY">NY</option><option value="NC">NC</option><option value="ND">ND</option><option value="OH">OH</option><option value="OK">OK</option><option value="OR">OR</option><option value="PA">PA</option><option value="RI">RI</option><option value="SC">SC</option><option value="SD">SD</option><option value="TN">TN</option><option value="TX">TX</option><option value="UT">UT</option><option value="VT">VT</option><option value="VA">VA</option><option value="WA">WA</option><option value="WV">WV</option><option value="WI">WI</option><option value="WY">WY</option>
+            </select>
+            <input id="physician" placeholder="Physician Name" required>
+            <button type="button" onclick="register()">Register</button>
+        </form>
+    </div>
+    <div id="main">
+        <div id="chat"></div>
+        <div id="inputArea"></div>
+        <button onclick="viewLogs()">View Logs</button>
+        <button onclick="generatePDF()">Generate PDF Report</button>
+        <button onclick="viewAnalytics()">View Analytics</button>
+        <button onclick="deleteApp()" style="background: #dc3545;">Delete App</button>
+    </div>
+    <script>
+        const stateTimezones = { /* same as before */ 'AL': 'America/Chicago', 'AK': 'America/Anchorage', 'AZ': 'America/Phoenix', 'AR': 'America/Chicago', 'CA': 'America/Los_Angeles', 'CO': 'America/Denver', 'CT': 'America/New_York', 'DE': 'America/New_York', 'FL': 'America/New_York', 'GA': 'America/New_York', 'HI': 'Pacific/Honolulu', 'ID': 'America/Boise', 'IL': 'America/Chicago', 'IN': 'America/Indianapolis', 'IA': 'America/Chicago', 'KS': 'America/Chicago', 'KY': 'America/New_York', 'LA': 'America/Chicago', 'ME': 'America/New_York', 'MD': 'America/New_York', 'MA': 'America/New_York', 'MI': 'America/Detroit', 'MN': 'America/Chicago', 'MS': 'America/Chicago', 'MO': 'America/Chicago', 'MT': 'America/Denver', 'NE': 'America/Chicago', 'NV': 'America/Los_Angeles', 'NH': 'America/New_York', 'NJ': 'America/New_York', 'NM': 'America/Denver', 'NY': 'America/New_York', 'NC': 'America/New_York', 'ND': 'America/Chicago', 'OH': 'America/New_York', 'OK': 'America/Chicago', 'OR': 'America/Los_Angeles', 'PA': 'America/New_York', 'RI': 'America/New_York', 'SC': 'America/New_York', 'SD': 'America/Chicago', 'TN': 'America/Chicago', 'TX': 'America/Chicago', 'UT': 'America/Denver', 'VT': 'America/New_York', 'VA': 'America/New_York', 'WA': 'America/Los_Angeles', 'WV': 'America/New_York', 'WI': 'America/Chicago', 'WY': 'America/Denver' };
+
+        let user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+        if (!user) {
+            document.getElementById('registration').style.display = 'block';
+        } else {
+            document.getElementById('main').style.display = 'block';
+            initApp();
+        }
+
+        function register() {
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const state = document.getElementById('state').value;
+            const physician = document.getElementById('physician').value;
+            if (firstName && lastName && state && physician) {
+                user = { firstName, lastName, state, physician };
+                localStorage.setItem('user', JSON.stringify(user));
+                document.getElementById('registration').style.display = 'none';
+                document.getElementById('main').style.display = 'block';
+                initApp();
+                sendInitialWelcome();
+            } else {
+                alert('Please fill all fields.');
+            }
+        }
+
+        function sendInitialWelcome() {
+            if (Notification.permission === 'granted') {
+                new Notification(`Welcome ${user.firstName}! Please watch the Interi System User Video and record your initial fluid level.`);
+            }
+            initialPrompt();
+        }
+
+        function initialPrompt() {
+            addMessage(`Hi ${user.firstName}! Welcome to the Interi Patient App. Please watch the User Video <a href="https://www.youtube.com/watch?v=RDwd2ENPB-w" target="_blank">here</a> and tell me your initial fluid level.`, 'app');
+            showFluidInput(true); // true for initial
+        }
+
+        function initApp() {
+            if ('Notification' in window) {
+                Notification.requestPermission();
+            }
+            setInterval(checkTime, 60000); // Check every minute
+            checkTime();
+        }
+
+        let lastPromptTime = 0;
+        function checkTime() {
+            const tz = stateTimezones[user.state];
+            const options = { timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false };
+            const formatter = new Intl.DateTimeFormat('en-US', options);
+            const parts = formatter.formatToParts(new Date());
+            const hour = parseInt(parts.find(p => p.type === 'hour').value);
+            const minute = parseInt(parts.find(p => p.type === 'minute').value);
+            const now = Date.now();
+            // For demo: Every 5 minutes during 12:00-12:59 PM
+            if (hour === 12 && minute % 5 === 0 && now - lastPromptTime > 240000) { // >4 minutes since last to avoid duplicates
+                lastPromptTime = now;
+                if (Notification.permission === 'granted') {
+                    new Notification(`Hi ${user.firstName}! It's time to check your fluid level.`);
+                }
+                startPrompt(`${hour}:${minute.toString().padStart(2, '0')}`);
+            }
+        }
+
+        function startPrompt(time) {
+            addMessage(`Hi ${user.firstName}! It’s ${time} and it’s time to check your fluid level on your Interi device. Please tell me where your fluid level is currently.`, 'app');
+            showFluidInput(false);
+        }
+
+        function showFluidInput(isInitial = false) {
+            const inputArea = document.getElementById('inputArea');
+            inputArea.innerHTML = `
+                <select id="hundreds"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+                <select id="tens"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+                <select id="units"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>
+                <button onclick="submitLevel(${isInitial})">Done</button>
+            `;
+        }
+
+        function submitLevel(isInitial = false) {
+            const hundreds = parseInt(document.getElementById('hundreds').value);
+            const tens = parseInt(document.getElementById('tens').value);
+            const units = parseInt(document.getElementById('units').value);
+            const level = hundreds * 100 + tens * 10 + units;
+            const now = new Date();
+            let logs = JSON.parse(localStorage.getItem('logs') || '[]');
+            const lastLevel = logs.length > 0 ? logs[logs.length - 1].level : -1;
+            logs.push({ time: now.toISOString(), date: now.toLocaleDateString('en-US'), level });
+            localStorage.setItem('logs', JSON.stringify(logs));
+
+            let response;
+            if (level > lastLevel) {
+                response = 'Great! Looks like the fluid is flowing. Keep up the good work!';
+            } else if (level === lastLevel) {
+                response = 'It looks like the fluid is NOT flowing. Please check the troubleshooting steps on pages 4-5 of the Patient Guide <a href="https://icsurgical.com/site/assets/files/1303/interi-system-patient-guide.pdf" target="_blank">here</a> or watch a demonstration on our User Video <a href="https://www.youtube.com/watch?v=RDwd2ENPB-w" target="_blank">here</a>.';
+                logAnalytics('no_flow');
+            } else {
+                response = 'Level noted. Keep monitoring!';
+            }
+            addMessage(`Your level: ${level}`, 'user');
+            addMessage(response, 'app');
+            addMessage('Is there anything else I can help with?', 'app');
+            showYesNo();
+        }
+
+        function showYesNo() {
+            const inputArea = document.getElementById('inputArea');
+            inputArea.innerHTML = `
+                <select id="help"><option>NO</option><option>YES</option></select>
+                <button onclick="submitHelp()">Submit</button>
+            `;
+        }
+
+        function submitHelp() {
+            const help = document.getElementById('help').value;
+            if (help === 'NO') {
+                addMessage('No', 'user');
+                addMessage('Okay, have a good day!', 'app');
+            } else {
+                addMessage('Yes', 'user');
+                addMessage('What can I help with? (For MVP, note your question and contact your physician.)', 'app');
+                logAnalytics('help_requested');
+            }
+            document.getElementById('inputArea').innerHTML = '';
+        }
+
+        function addMessage(msg, type = 'app') {
+            const chat = document.getElementById('chat');
+            const p = document.createElement('p');
+            p.innerHTML = msg;
+            p.classList.add(type);
+            chat.appendChild(p);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function logAnalytics(event) {
+            let analytics = JSON.parse(localStorage.getItem('analytics') || '[]');
+            analytics.push({ time: new Date().toISOString(), event });
+            localStorage.setItem('analytics', JSON.stringify(analytics));
+        }
+
+        function viewLogs() {
+            const logs = JSON.parse(localStorage.getItem('logs') || '[]');
+            let table = '<table><tr><th>Date</th><th>Time</th><th>Level</th></tr>';
+            logs.forEach(log => {
+                const time = new Date(log.time).toLocaleTimeString('en-US');
+                table += `<tr><td>${log.date}</td><td>${time}</td><td>${log.level}</td></tr>`;
+            });
+            table += '</table>';
+
+            // Calculate daily totals
+            const dailyTotals = {};
+            for (let i = 0; i < logs.length; i++) {
+                const log = logs[i];
+                const prevLevel = i === 0 ? 0 : logs[i-1].level;
+                const delta = Math.max(0, log.level - prevLevel); // Only positive increases
+                if (!dailyTotals[log.date]) dailyTotals[log.date] = 0;
+                dailyTotals[log.date] += delta;
+            }
+            let totalsHtml = '<h3>Daily Fluid Volume Totals</h3><table><tr><th>Date</th><th>Total Volume</th></tr>';
+            for (const date in dailyTotals) {
+                totalsHtml += `<tr><td>${date}</td><td>${dailyTotals[date]}</td></tr>`;
+            }
+            totalsHtml += '</table>';
+
+            document.getElementById('chat').innerHTML = table + totalsHtml;
+        }
+
+        function viewAnalytics() {
+            const analytics = JSON.parse(localStorage.getItem('analytics') || '[]');
+            const logs = JSON.parse(localStorage.getItem('logs') || '[]');
+            const engagement = logs.length; // Checks done
+            const noFlowCount = analytics.filter(a => a.event === 'no_flow').length;
+            const helpCount = analytics.filter(a => a.event === 'help_requested').length;
+            let summary = `<p>Engagement: ${engagement} checks</p><p>No Flow Instances: ${noFlowCount}</p><p>Help Requests: ${helpCount} (indicating confusion)</p>`;
+            document.getElementById('chat').innerHTML = summary;
+        }
+
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text(`Patient Report for ${user.firstName} ${user.lastName}`, 10, 10);
+            doc.text(`Physician: ${user.physician} | State: ${user.state}`, 10, 20);
+            doc.text('Fluid Levels:', 10, 30);
+            const logs = JSON.parse(localStorage.getItem('logs') || '[]');
+            let y = 40;
+            logs.forEach(log => {
+                doc.text(`${log.date} ${new Date(log.time).toLocaleTimeString('en-US')}: ${log.level}`, 10, y);
+                y += 10;
+            });
+            if (logs.length > 0) {
+                const avg = logs.reduce((sum, l) => sum + l.level, 0) / logs.length;
+                doc.text(`Average Level: ${avg.toFixed(2)}`, 10, y);
+                y += 10;
+                const noFlow = logs.filter((l, i) => i > 0 && l.level === logs[i-1].level).length;
+                doc.text(`No Flow Instances: ${noFlow}`, 10, y);
+                y += 10;
+            }
+
+            // Daily totals in PDF
+            doc.text('Daily Fluid Volume Totals:', 10, y);
+            y += 10;
+            const dailyTotals = {};
+            for (let i = 0; i < logs.length; i++) {
+                const log = logs[i];
+                const prevLevel = i === 0 ? 0 : logs[i-1].level;
+                const delta = Math.max(0, log.level - prevLevel);
+                if (!dailyTotals[log.date]) dailyTotals[log.date] = 0;
+                dailyTotals[log.date] += delta;
+            }
+            for (const date in dailyTotals) {
+                doc.text(`${date}: ${dailyTotals[date]}`, 10, y);
+                y += 10;
+            }
+
+            const analytics = JSON.parse(localStorage.getItem('analytics') || '[]');
+            doc.text(`Analytics: Help Requests - ${analytics.filter(a => a.event === 'help_requested').length}`, 10, y);
+            doc.save('interi_report.pdf');
+        }
+
+        function deleteApp() {
+            if (confirm('Are you sure you want to delete the app and all data? This cannot be undone.')) {
+                localStorage.clear();
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(registrations => {
+                        for (let reg of registrations) {
+                            reg.unregister();
+                        }
+                    }).then(() => {
+                        alert('App data deleted. Please remove the app from your home screen (long-press the icon and select "Remove" or "Delete"). You can now close this tab.');
+                        location.reload(); // Reload to reset state
+                    }).catch(err => console.error('Error unregistering service worker', err));
+                } else {
+                    alert('App data deleted. Please remove the app from your home screen if installed.');
+                    window.location.reload();
+                }
+            }
+        }
+
+        // Basic service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(new URL('', location.href), { scope: '/' })
+                .then(() => console.log('Service Worker registered'))
+                .catch(err => console.error('Service Worker error', err));
+        }
+    </script>
+</body>
+</html>
